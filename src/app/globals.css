@@ -31,6 +31,12 @@ body {
   font-family: var(--font-sans);
 }
 
+/* Tabular numbers for financial displays */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
 /* Custom range slider */
 input[type="range"] {
   -webkit-appearance: none;
@@ -49,6 +55,10 @@ input[type="range"]::-webkit-slider-thumb {
   background: var(--color-volare-green);
   box-shadow: 0 2px 8px rgba(0, 162, 67, 0.4);
   cursor: pointer;
+  transition: transform 0.15s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
 }
 input[type="range"]::-moz-range-thumb {
   width: 22px;
@@ -68,10 +78,10 @@ input[type="number"] {
 }
 
 .fade-in {
-  animation: fadeIn 0.3s ease-out;
+  animation: fadeIn 0.4s ease-out;
 }
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -81,4 +91,9 @@ input[type="number"] {
 @keyframes fadeBackdrop {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* Recharts tooltip override for dark theme */
+.recharts-tooltip-wrapper {
+  outline: none !important;
 }

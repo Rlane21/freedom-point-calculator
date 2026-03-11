@@ -1,22 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
+import { leadReportEmail } from "@/lib/emailTemplates";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, email, phone, results } = body;
+    const { name, email, phone, results, pdfBase64 } = body;
 
     if (!name || !email) {
       return NextResponse.json({ error: "Name and email are required" }, { status: 400 });
     }
 
-    // If Resend API key is configured, send email notification
     const resendKey = process.env.RESEND_API_KEY;
     const notifyEmail = process.env.NOTIFY_EMAIL || "robert@volare.ai";
+    let emailSent = false;
 
     if (resendKey) {
       const { Resend } = await import("resend");
       const resend = new Resend(resendKey);
 
+      // Email 1: Notification to Robert (existing)
       await resend.emails.send({
         from: "Freedom Point Calculator <notifications@volare.ai>",
         to: notifyEmail,
@@ -51,17 +53,51 @@ export async function POST(request: NextRequest) {
           </div>
         `,
       });
+
+      // Email 2: Branded report email to the lead
+      if (pdfBase64) {
+        try {
+          const firstName = name.split(" ")[0] || name;
+          const htmlContent = leadReportEmail({
+            firstName,
+            freedomPoint: results?.grossSalePrice || "—",
+            currentValuation: results?.currentValuation || "—",
+            gap: results?.gap || "—",
+            isAbove: results?.isAbove || false,
+            progressPercent: results?.progressPercent || 0,
+          });
+
+          await resend.emails.send({
+            from: "Volare Advisory <reports@volare.ai>",
+            to: email,
+            subject: "Your Freedom Point Report — Volare Advisory",
+            html: htmlContent,
+            attachments: [
+              {
+                filename: `Freedom-Point-Report_${firstName}.pdf`,
+                content: pdfBase64,
+              },
+            ],
+          });
+
+          emailSent = true;
+        } catch (emailErr) {
+          console.error("Failed to send report email to lead:", emailErr);
+          // Don't fail the whole request — the PDF download still works
+        }
+      }
     }
 
-    // Always log to console (useful for Vercel logs)
+    // Always log to console
     console.log("=== NEW FREEDOM POINT LEAD ===");
     console.log(`Name: ${name}`);
     console.log(`Email: ${email}`);
     if (phone) console.log(`Phone: ${phone}`);
     if (results) console.log("Results:", JSON.stringify(results));
+    console.log(`Email sent to lead: ${emailSent}`);
     console.log("==============================");
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, emailSent });
   } catch (error) {
     console.error("Lead capture error:", error);
     return NextResponse.json({ error: "Failed to process lead" }, { status: 500 });

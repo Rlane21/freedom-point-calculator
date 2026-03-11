@@ -1,11 +1,16 @@
 "use client";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, lazy, Suspense } from "react";
 import { calculate, formatCurrency, type CalculatorInputs, type DebtItem } from "@/lib/calculator";
 import { generatePDFReport } from "@/lib/generateReport";
 import Card from "@/components/Card";
 import CurrencyInput from "@/components/CurrencyInput";
 import ResultRow from "@/components/ResultRow";
 import LeadCaptureModal from "@/components/LeadCaptureModal";
+import AnimatedNumber from "@/components/AnimatedNumber";
+import Image from "next/image";
+
+// Lazy-load ScenarioExplorer to avoid recharts on initial page load
+const ScenarioExplorer = lazy(() => import("@/components/ScenarioExplorer"));
 
 const DEFAULT_INPUTS: CalculatorInputs = {
   income: 0, otherIncome: 0,
@@ -20,6 +25,7 @@ export default function Home() {
   const [showModal, setShowModal] = useState(false);
   const [leadLoading, setLeadLoading] = useState(false);
   const [reportGenerated, setReportGenerated] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<"none" | "sent" | "failed">("none");
 
   const results = useMemo(() => calculate(inputs), [inputs]);
 
@@ -45,8 +51,7 @@ export default function Home() {
   const removeDebt = useCallback((index: number) => {
     setInputs((prev) => {
       if (prev.businessDebts.length <= 1) {
-        const debts = [{ label: "", amount: 0 }];
-        return { ...prev, businessDebts: debts };
+        return { ...prev, businessDebts: [{ label: "", amount: 0 }] };
       }
       return { ...prev, businessDebts: prev.businessDebts.filter((_, i) => i !== index) };
     });
@@ -55,8 +60,28 @@ export default function Home() {
   const handleLeadSubmit = async (data: { name: string; email: string; phone?: string }) => {
     setLeadLoading(true);
     try {
-      // Send lead data to API
-      await fetch("/api/lead", {
+      // Generate PDF as arraybuffer
+      const pdfBytes = generatePDFReport(inputs, results, data.name);
+
+      // Download the PDF locally
+      const blob = new Blob([new Uint8Array(pdfBytes)], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Freedom-Point-Report_${data.name.replace(/\s+/g, "-")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      // Convert to base64 for email
+      const uint8 = new Uint8Array(pdfBytes);
+      let binary = "";
+      for (let i = 0; i < uint8.length; i++) {
+        binary += String.fromCharCode(uint8[i]);
+      }
+      const pdfBase64 = btoa(binary);
+
+      // Send lead data + PDF to API
+      const res = await fetch("/api/lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -70,18 +95,22 @@ export default function Home() {
             isAbove: results.isAboveFreedomPoint,
             healthScore: inputs.healthScore,
             ebitda: results.hasValuationData ? formatCurrency(inputs.ebitda) : null,
+            progressPercent: results.progressPercent,
           },
+          pdfBase64,
         }),
       });
 
-      // Generate and download PDF
-      const doc = generatePDFReport(inputs, results, data.name);
-      doc.save(`Freedom-Point-Report_${data.name.replace(/\s+/g, "-")}.pdf`);
-
+      const responseData = await res.json();
+      setEmailStatus(responseData.emailSent ? "sent" : "failed");
       setReportGenerated(true);
       setShowModal(false);
     } catch (err) {
       console.error("Lead submission error:", err);
+      // PDF already downloaded, so still show success
+      setReportGenerated(true);
+      setEmailStatus("failed");
+      setShowModal(false);
     } finally {
       setLeadLoading(false);
     }
@@ -91,17 +120,21 @@ export default function Home() {
 
   return (
     <div className="min-h-screen py-8 px-4 md:px-6">
-      <div className="max-w-[580px] mx-auto">
+      <div className="max-w-[640px] mx-auto">
 
         {/* ─── HEADER ─────────────────────── */}
         <div className="bg-gs-900 rounded-2xl p-7 mb-5 relative overflow-hidden">
           <div className="absolute -bottom-15 -right-15 w-[200px] h-[200px] pointer-events-none"
             style={{ background: "radial-gradient(circle, rgba(0,162,67,.2) 0%, transparent 70%)" }} />
           <div className="mb-5">
-            <svg width="120" height="28" viewBox="0 0 120 28" fill="none">
-              <text x="0" y="20" fill="#00a243" fontFamily="Inter, sans-serif" fontWeight="800" fontSize="18" letterSpacing="-0.5">VOLARE</text>
-              <text x="85" y="20" fill="#677489" fontFamily="Inter, sans-serif" fontWeight="600" fontSize="12">AI</text>
-            </svg>
+            <Image
+              src="/brand/Volare-AI-Wordmark-Green.png"
+              alt="Volare AI"
+              width={130}
+              height={26}
+              className="h-[26px] w-auto"
+              priority
+            />
           </div>
           <div className="text-[11px] font-bold tracking-[.18em] uppercase text-volare-green mb-1.5">
             Advisory Tool
@@ -121,7 +154,9 @@ export default function Home() {
               Freedom<br />Point
             </div>
             <div className="text-[20px] md:text-[22px] font-black leading-none text-base-white tracking-tight">
-              {results.hasFullData && results.grossSalePriceNeeded > 0 ? formatCurrency(results.grossSalePriceNeeded) : "—"}
+              {results.hasFullData && results.grossSalePriceNeeded > 0 ? (
+                <AnimatedNumber value={results.grossSalePriceNeeded} />
+              ) : "—"}
             </div>
             <div className="text-[10px] text-volare-green-light/70 mt-1 leading-tight">
               Gross sale price needed
@@ -132,7 +167,9 @@ export default function Home() {
               Current<br />Value
             </div>
             <div className="text-[20px] md:text-[22px] font-black leading-none text-base-white tracking-tight">
-              {results.hasValuationData ? formatCurrency(results.currentValuation) : "—"}
+              {results.hasValuationData ? (
+                <AnimatedNumber value={results.currentValuation} />
+              ) : "—"}
             </div>
             <div className="text-[10px] text-gs-500 mt-1 leading-tight">
               At current health
@@ -147,7 +184,9 @@ export default function Home() {
                 ? results.isAboveFreedomPoint ? "text-volare-green-mid" : "text-[#ff7b7b]"
                 : "text-base-white"
             }`}>
-              {results.hasFullData && results.hasValuationData ? formatCurrency(Math.abs(results.gap)) : "—"}
+              {results.hasFullData && results.hasValuationData ? (
+                <AnimatedNumber value={Math.abs(results.gap)} />
+              ) : "—"}
             </div>
             <div className="text-[10px] text-gs-500 mt-1 leading-tight">
               {results.isAboveFreedomPoint ? "Above Freedom Point" : "To close in 5 years"}
@@ -160,12 +199,23 @@ export default function Home() {
           <div className="bg-base-white border border-gs-200 rounded-xl px-4 py-4 mb-5 fade-in">
             <div className="flex justify-between text-[11px] font-semibold text-gs-500 mb-2">
               <span>0%</span>
-              <span>{results.progressPercent}% of Freedom Point</span>
+              <span className="tabular-nums">{results.progressPercent}% of Freedom Point</span>
             </div>
-            <div className="h-2.5 bg-gs-200 rounded-full overflow-hidden">
+            <div className="relative h-3 bg-gs-200 rounded-full overflow-hidden">
+              {/* Milestone markers */}
+              {[25, 50, 75].map((pct) => (
+                <div
+                  key={pct}
+                  className="absolute top-0 bottom-0 w-px bg-gs-300/60"
+                  style={{ left: `${pct}%` }}
+                />
+              ))}
               <div
-                className="h-full bg-volare-green rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${results.progressPercent}%` }}
+                className="h-full rounded-full transition-all duration-700 ease-out"
+                style={{
+                  width: `${results.progressPercent}%`,
+                  background: "linear-gradient(90deg, #00a243, #4dbe7b)",
+                }}
               />
             </div>
             <p className="text-[11px] text-gs-500 mt-2 leading-relaxed">
@@ -340,7 +390,7 @@ export default function Home() {
                   What the business must sell for to hit your Freedom Point
                 </div>
               </div>
-              <div className="text-[17px] font-black text-white">
+              <div className="text-[17px] font-black text-white tabular-nums">
                 {formatCurrency(results.grossSalePriceNeeded)}
               </div>
             </div>
@@ -407,7 +457,7 @@ export default function Home() {
                     <div className="text-xs font-semibold text-gs-700">{row.label}</div>
                     <div className="text-[10.5px] text-gs-400 mt-0.5">{row.sub}</div>
                   </div>
-                  <div className={`text-[17px] font-black ${row.active ? "text-volare-green-dark" : "text-gs-800"}`}>
+                  <div className={`text-[17px] font-black tabular-nums ${row.active ? "text-volare-green-dark" : "text-gs-800"}`}>
                     {formatCurrency(row.val)}
                   </div>
                 </div>
@@ -415,6 +465,17 @@ export default function Home() {
             </div>
           )}
         </Card>
+
+        {/* ─── SCENARIO EXPLORER ───────────── */}
+        {results.hasFullData && results.hasValuationData && (
+          <Suspense fallback={
+            <div className="mt-5 mb-4 bg-gs-900 rounded-2xl p-6 text-center">
+              <div className="text-gs-400 text-sm">Loading Scenario Explorer...</div>
+            </div>
+          }>
+            <ScenarioExplorer inputs={inputs} results={results} />
+          </Suspense>
+        )}
 
         {/* ─── CTA: GET YOUR REPORT ──────── */}
         <div className="mt-6 mb-4">
@@ -428,7 +489,13 @@ export default function Home() {
           ) : (
             <div className="bg-volare-green-bg border border-volare-green-light rounded-2xl p-5 text-center fade-in">
               <div className="text-volare-green text-lg font-bold mb-1">Report Downloaded!</div>
-              <p className="text-sm text-gs-600 mb-4">Check your downloads folder for your personalized Freedom Point Report.</p>
+              <p className="text-sm text-gs-600 mb-1">Check your downloads folder for your personalized Freedom Point Report.</p>
+              {emailStatus === "sent" && (
+                <p className="text-xs text-volare-green-dark mb-3">A copy has also been sent to your email.</p>
+              )}
+              {emailStatus === "failed" && (
+                <p className="text-xs text-gs-400 mb-3">Email delivery could not be confirmed — your PDF was still downloaded.</p>
+              )}
               <button
                 onClick={() => setShowModal(true)}
                 className="text-sm font-semibold text-volare-green hover:underline"
