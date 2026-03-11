@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-volare-green: #00a243;
+  --color-volare-green-hover: #00923c;
+  --color-volare-green-dark: #00712f;
+  --color-volare-green-deep: #005122;
+  --color-volare-green-light: #80d1a1;
+  --color-volare-green-mid: #4dbe7b;
+  --color-volare-green-bg: #e6f6ec;
+  --color-volare-green-bright: #1aab56;
+  --color-volare-green-soft: #b3e3c7;
+  --color-gs-50: #F8FAFC;
+  --color-gs-100: #F2F5F9;
+  --color-gs-200: #E3E8EF;
+  --color-gs-300: #CDD5E0;
+  --color-gs-400: #97A3B6;
+  --color-gs-500: #677489;
+  --color-gs-600: #4A5567;
+  --color-gs-700: #364153;
+  --color-gs-800: #20293A;
+  --color-gs-900: #111729;
+  --color-base-white: #F7F7F3;
+  --color-base-black: #111111;
+  --font-sans: "Inter", system-ui, sans-serif;
+}
+
+body {
+  background: var(--color-gs-100);
+  color: var(--color-gs-800);
+  font-family: var(--font-sans);
+}
+
+/* Custom range slider */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--color-gs-200);
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-volare-green);
+  box-shadow: 0 2px 8px rgba(0, 162, 67, 0.4);
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-volare-green);
+  border: none;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.modal-backdrop {
+  animation: fadeBackdrop 0.2s ease-out;
+}
+@keyframes fadeBackdrop {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
