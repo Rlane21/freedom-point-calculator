@@ -38,7 +38,7 @@ export function leadReportEmail(data: ReportEmailData): string {
   <tr><td style="background:#ffffff;padding:32px;">
 
     <p style="color:#364153;font-size:15px;line-height:1.6;margin:0 0 24px;">
-      Your personalized Freedom Point Report is attached to this email. Here's a quick snapshot of your results:
+      Your Freedom Point Report has been downloaded to your device. Here's a quick snapshot of your results:
     </p>
 
     <!-- Three Numbers -->
@@ -85,7 +85,7 @@ export function leadReportEmail(data: ReportEmailData): string {
     </div>
 
     <p style="color:#97A3B6;font-size:12px;line-height:1.5;margin:0;border-top:1px solid #E3E8EF;padding-top:20px;">
-      Your full Freedom Point Report is attached as a PDF. Open it for a detailed breakdown of your income needs, personal assets, business debt, valuation scenarios, and personalized guidance.
+      Your full Freedom Point Report was downloaded when you completed the calculator. It includes a detailed breakdown of your income needs, personal assets, business debt, valuation scenarios, and personalized guidance.
     </p>
 
   </td></tr>

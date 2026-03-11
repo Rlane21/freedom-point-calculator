@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { leadReportEmail } from "@/lib/emailTemplates";
 
+export const maxDuration = 30; // seconds
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, email, phone, results, pdfBase64 } = body;
+    const { name, email, phone, results } = body;
 
     if (!name || !email) {
       return NextResponse.json({ error: "Name and email are required" }, { status: 400 });
@@ -54,37 +56,29 @@ export async function POST(request: NextRequest) {
         `,
       });
 
-      // Email 2: Branded report email to the lead
-      if (pdfBase64) {
-        try {
-          const firstName = name.split(" ")[0] || name;
-          const htmlContent = leadReportEmail({
-            firstName,
-            freedomPoint: results?.grossSalePrice || "—",
-            currentValuation: results?.currentValuation || "—",
-            gap: results?.gap || "—",
-            isAbove: results?.isAbove || false,
-            progressPercent: results?.progressPercent || 0,
-          });
+      // Email 2: Branded summary email to the lead (PDF downloads separately)
+      try {
+        const firstName = name.split(" ")[0] || name;
+        const htmlContent = leadReportEmail({
+          firstName,
+          freedomPoint: results?.grossSalePrice || "—",
+          currentValuation: results?.currentValuation || "—",
+          gap: results?.gap || "—",
+          isAbove: results?.isAbove || false,
+          progressPercent: results?.progressPercent || 0,
+        });
 
-          await resend.emails.send({
-            from: "Volare Advisory <reports@volare.ai>",
-            to: email,
-            subject: "Your Freedom Point Report — Volare Advisory",
-            html: htmlContent,
-            attachments: [
-              {
-                filename: `Freedom-Point-Report_${firstName}.pdf`,
-                content: pdfBase64,
-              },
-            ],
-          });
+        await resend.emails.send({
+          from: "Volare Advisory <reports@volare.ai>",
+          to: email,
+          subject: "Your Freedom Point Results — Volare Advisory",
+          html: htmlContent,
+        });
 
-          emailSent = true;
-        } catch (emailErr) {
-          console.error("Failed to send report email to lead:", emailErr);
-          // Don't fail the whole request — the PDF download still works
-        }
+        emailSent = true;
+      } catch (emailErr) {
+        console.error("Failed to send report email to lead:", emailErr);
+        // Don't fail the whole request — the PDF download still works
       }
     }
 

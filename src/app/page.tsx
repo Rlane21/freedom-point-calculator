@@ -72,33 +72,26 @@ export default function Home() {
       a.click();
       URL.revokeObjectURL(url);
 
-      // Convert to base64 for email
-      const uint8 = new Uint8Array(pdfBytes);
-      let binary = "";
-      for (let i = 0; i < uint8.length; i++) {
-        binary += String.fromCharCode(uint8[i]);
-      }
-      const pdfBase64 = btoa(binary);
+      // Send lead data to API (PDF downloaded locally, email sent separately)
+      const leadPayload = {
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        results: {
+          grossSalePrice: results.hasFullData ? formatCurrency(results.grossSalePriceNeeded) : null,
+          currentValuation: results.hasValuationData ? formatCurrency(results.currentValuation) : null,
+          gap: results.hasFullData && results.hasValuationData ? formatCurrency(Math.abs(results.gap)) : null,
+          isAbove: results.isAboveFreedomPoint,
+          healthScore: inputs.healthScore,
+          ebitda: results.hasValuationData ? formatCurrency(inputs.ebitda) : null,
+          progressPercent: results.progressPercent,
+        },
+      };
 
-      // Send lead data + PDF to API
       const res = await fetch("/api/lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          results: {
-            grossSalePrice: results.hasFullData ? formatCurrency(results.grossSalePriceNeeded) : null,
-            currentValuation: results.hasValuationData ? formatCurrency(results.currentValuation) : null,
-            gap: results.hasFullData && results.hasValuationData ? formatCurrency(Math.abs(results.gap)) : null,
-            isAbove: results.isAboveFreedomPoint,
-            healthScore: inputs.healthScore,
-            ebitda: results.hasValuationData ? formatCurrency(inputs.ebitda) : null,
-            progressPercent: results.progressPercent,
-          },
-          pdfBase64,
-        }),
+        body: JSON.stringify(leadPayload),
       });
 
       const responseData = await res.json();
@@ -491,10 +484,10 @@ export default function Home() {
               <div className="text-volare-green text-lg font-bold mb-1">Report Downloaded!</div>
               <p className="text-sm text-gs-600 mb-1">Check your downloads folder for your personalized Freedom Point Report.</p>
               {emailStatus === "sent" && (
-                <p className="text-xs text-volare-green-dark mb-3">A copy has also been sent to your email.</p>
+                <p className="text-xs text-volare-green-dark mb-3">A summary of your results has also been sent to your email.</p>
               )}
               {emailStatus === "failed" && (
-                <p className="text-xs text-gs-400 mb-3">Email delivery could not be confirmed — your PDF was still downloaded.</p>
+                <p className="text-xs text-gs-400 mb-3">We couldn&apos;t send the email summary — but your PDF report was downloaded successfully.</p>
               )}
               <button
                 onClick={() => setShowModal(true)}
